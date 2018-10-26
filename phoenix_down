@@ -1,3 +1,4 @@
+#! /bin/sh
 fancy_echo() {
   printf "\n%b\n" "$1"
 }
@@ -6,7 +7,7 @@ append_to_zshrc() {
   local text="$1" zshrc
   local skip_new_line="$2"
 
-  if [[ -w "$HOME/.zshrc.local" ]]; then
+  if [ -w "$HOME/.zshrc.local" ]; then
     zshrc="$HOME/.zshrc.local"
   else
     zshrc="$HOME/.zshrc"
@@ -27,7 +28,7 @@ trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 
 set -e
 
-if [[ ! -d "$HOME/.bin/" ]]; then
+if [ ! -d "$HOME/.bin/" ]; then
   mkdir "$HOME/.bin"
 fi
 
@@ -38,71 +39,81 @@ fi
 append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
 
 fancy_echo "Updating system packages ..."
- if command -v aptitude >/dev/null; then
-    fancy_echo "Using aptitude ..."
-  else
-    fancy_echo "Installing aptitude ..."
-    sudo apt-get install -y aptitude
-  fi
-  sudo aptitude update
-  sudo aptitude -y dist-upgrade
+if command -v aptitude >/dev/null; then
+  fancy_echo "Using aptitude ..."
+else
+  fancy_echo "Installing aptitude ..."
+  sudo apt-get install -y aptitude
+fi
+
+sudo aptitude update
+sudo aptitude -y dist-upgrade
 
 fancy_echo "Installing git, for source control management ..."
-  sudo aptitude install -y git
+sudo aptitude install -y git
 
-fancy_echo "Installing ctags, to index files for vim tab completion of methods, classes, variables ..."
-  sudo aptitude install -y exuberant-ctags
+fancy_echo "Installing ctags ..."
+sudo aptitude install -y exuberant-ctags
 
 fancy_echo "Installing neovim ..."
-  sudo aptitude install -y neovim
+sudo aptitude install -y neovim
 
 fancy_echo "Installing curl ..."
-  sudo aptitude install -y curl
+sudo aptitude install -y curl
 
 fancy_echo "Installing zsh ..."
-  sudo aptitude install -y zsh
+sudo aptitude install -y zsh
 
 fancy_echo "Changing your shell to zsh ..."
-  chsh -s $(which zsh)
-if [[ ! -d "$HOME/.nodenv" ]]; then
+chsh -s $(which zsh)
+
+if [ ! -d "$HOME/.nodenv" ]; then
   fancy_echo "Installing nodenv to manage node versions ..."
-    git clone https://github.com/nodenv/nodenv.git ~/.nodenv
+  git clone https://github.com/nodenv/nodenv.git ~/.nodenv
 
-    append_to_zshrc 'export PATH="$HOME/.nodenv/bin:$PATH"'
-    append_to_zshrc 'eval "$(nodenv init - zsh --no-rehash)"' 1
-    export PATH="$HOME/.nodenv/bin:$PATH"
-    eval "$(nodenv init - zsh)"
-  fi
-
-if [[ ! -d "$HOME/.nodenv/plugins/node-build" ]]; then
-  fancy_echo "Install node-build, to install Node versions ..."
-    git clone https://github.com/nodenv/node-build.git $(nodenv root)/plugins/node-build
+  append_to_zshrc 'export PATH="$HOME/.nodenv/bin:$PATH"'
+  append_to_zshrc 'eval "$(nodenv init - zsh --no-rehash)"' 1
+  export PATH="$HOME/.nodenv/bin:$PATH"
+  eval "$(nodenv init - zsh)"
 fi
+
+if [ ! -d "$HOME/.nodenv/plugins/node-build" ]; then
+  fancy_echo "Install node-build, to install Node versions ..."
+  git clone \
+    https://github.com/nodenv/node-build.git $(nodenv root)/plugins/node-build
+fi
+
 fancy_echo "Installing the version of Node used for Lando ..."
-  LANDO_NODE=$(curl -sSL https://raw.githubusercontent.com/lando/lando/master/.node-version)
+LANDO_NODE=$(curl -sSL \
+  https://raw.githubusercontent.com/lando/lando/master/.node-version)
 
 fancy_echo "Setting $LANDO_NODE as the global default Node ..."
-  nodenv install -s $LANDO_NODE
-  nodenv rehash
 
-fancy_echo "Setting up RCM to manage dotfiles ..."
-  if ! command -v rcup >/dev/null; then
-    wget -qO - https://apt.thoughtbot.com/thoughtbot.gpg.key | sudo apt-key add -
-    echo "deb https://apt.thoughtbot.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/thoughtbot.list
-    sudo aptitude update
-    sudo aptitude install rcm
-  fi
+nodenv install -s $LANDO_NODE
+nodenv rehash
 
-fancy_echo "Making sure you're setup for ssh ..."
+
+if ! command -v rcup >/dev/null; then
+  fancy_echo "Setting up RCM to manage dotfiles ..."
+  wget -qO - https://apt.thoughtbot.com/thoughtbot.gpg.key | sudo apt-key add -
+  echo "deb https://apt.thoughtbot.com/debian/ stable main" \
+    | sudo tee /etc/apt/sources.list.d/thoughtbot.list
+  sudo aptitude update
+  sudo aptitude install rcm
+fi
+
+
   if [ ! -f ~/.ssh/id_rsa.pub ]; then
+    fancy_echo "Making sure you're setup for ssh ..."
     fancy_echo "Enter your email and then press [ENTER]:"
     read email
     ssh-keygen -t rsa -b 4096 -C "$email"
     eval "$(ssh-agent -s)"
     ssh-add ~/.ssh/id_rsa
   fi
-fancy_echo "Setting up Hub ..."
+
   if ! command -v hub >/dev/null; then
+    fancy_echo "Setting up Hub ..."
     # Install binary and documentation
     sudo add-apt-repository ppa:cpick/hub
     sudo aptitude update
@@ -111,8 +122,9 @@ fancy_echo "Setting up Hub ..."
     # add alias
     append_to_zshrc "$(hub alias -s)"
   fi
-fancy_echo "Installing Docker ..."
+
   if ! command -v docker >/dev/null; then
+    fancy_echo "Installing Docker ..."
     sudo aptitude remove docker docker-engine docker.io
     sudo aptitude install \
       apt-transport-https \
@@ -130,10 +142,44 @@ fancy_echo "Installing Docker ..."
     fancy_echo "Don't forget to logout and back in for Docker to work!"
   fi
 
-fancy_echo "Picking Lando up from Cloud City ..."
-  if ! command -v lando >/dev/null; then
 
+  if ! command -v lando >/dev/null; then
+    fancy_echo "Picking Lando up from Cloud City ..."
+    TEMP_DEB="$(mktemp)" &&
+    wget -O "$TEMP_DEB" \
+      'https://github.com/lando/lando/releases/download/v3.0.0-rc.1/lando-v3.0.0-rc.1.deb' &&
+    sudo dpkg -i "$TEMP_DEB"
+    rm -f "$TEMP_DEB"
   fi
+
+
+  if [ ! -d ~/.fonts ]; then
+    fancy_echo "Getting some fancy icons for a sweet lookin terminal ..."
+    git clone https://github.com/gabrielelana/awesome-terminal-fonts.git \
+      ~/.awesome-terminal-fonts
+    mkdir -p ~/.fonts
+    sed -i 's/<family>PragmataPro<\/family>/<family>Roboto Mono<\/family>/' \
+      ~/.awesome-terminal-fonts/config/10-symbols.conf
+    cp -f ~/.awesome-terminal-fonts/build/*.ttf ~/.fonts
+    cp -f ~/.awesome-terminal-fonts/build/*.sh ~/.fonts
+    mkdir -p ~/.config/fontconfig/conf.d
+    cp -f ~/.awesome-terminal-fonts/config/* ~/.config/fontconfig/conf.d
+    fc-cache -fv ~/.fonts
+    append_to_zshrc "source ~/.fonts/fontawesome-regular.sh"
+  fi
+
+
+if [ ! -f ~/antigen.zsh ]; then
+  fancy_echo "Setting up Antigen for fancy ZSH things..."
+  curl -L git.io/antigen > ~/antigen.zsh
+  append_to_zshrc "source ~/antigen.zsh"
+  append_to_zshrc "antigen use oh-my-zsh"
+  append_to_zshrc "antigen bundle git"
+  append_to_zshrc "antigen bundle zsh-users/zsh-syntax-highlighting"
+  append_to_zshrc "antigen bundle zsh-users/zsh-autosuggestions"
+  append_to_zshrc "antigen theme cloud"
+  append_to_zshrc "antigen apply"
+fi
 fancy_echo "Installing your personal additions from ~/.laptop.local ..."
   if [ -f ~/.laptop.local ]; then
     source ~/.laptop.local
