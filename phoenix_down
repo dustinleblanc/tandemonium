@@ -36,6 +36,9 @@ if [ ! -f "$HOME/.zshrc" ]; then
   touch "$HOME/.zshrc"
 fi
 
+fancy_echo "What is your Github Username?"
+read github_name
+
 fancy_echo "Updating system packages ..."
 if command -v aptitude >/dev/null; then
   fancy_echo "Using aptitude ..."
@@ -69,7 +72,14 @@ if [ ! -d "$HOME/dotfiles" ]; then
   env RCRC=$HOME/dotfiles/rcrc rcup 
 fi
 
-
+if [ ! -d "$HOME/dotfiles-local" ]; then 
+  if git ls-remote https://github.com/$github_name/dotfiles-local.git -q; then
+    fancy_echo "Grabbing your local dotfiles ..."
+    git clone https://github.com/$github_name/dotfiles-local.git \
+      ~/dotfiles-local
+    env RCRC=$HOME/dotfiles/rcrc rcup 
+  fi
+fi
 
 fancy_echo "Installing ctags ..."
 sudo aptitude install -y exuberant-ctags
@@ -90,8 +100,6 @@ if [ ! -d "$HOME/.nodenv" ]; then
   fancy_echo "Installing nodenv to manage node versions ..."
   git clone https://github.com/nodenv/nodenv.git ~/.nodenv
 
-  append_to_zshrc 'export PATH="$HOME/.nodenv/bin:$PATH"'
-  append_to_zshrc 'eval "$(nodenv init - zsh --no-rehash)"' 1
   export PATH="$HOME/.nodenv/bin:$PATH"
   eval "$(nodenv init - zsh)"
 fi
@@ -174,7 +182,7 @@ if [ ! -d ~/.fonts ]; then
   mkdir -p ~/.config/fontconfig/conf.d
   cp -f ~/.awesome-terminal-fonts/config/* ~/.config/fontconfig/conf.d
   fc-cache -fv ~/.fonts
-  append_to_zshrc "source ~/.fonts/fontawesome-regular.sh"
+  fancy_echo "If you want to use the fancy icons, make sure to use roboto mono"
 fi
 
 
@@ -189,8 +197,9 @@ if [ ! -f ~/antigen.zsh ]; then
   append_to_zshrc "antigen theme cloud"
   append_to_zshrc "antigen apply"
 fi
-fancy_echo "Installing your personal additions from ~/.laptop.local ..."
+
 if [ -f ~/.laptop.local ]; then
+  fancy_echo "Installing your personal additions from ~/.laptop.local ..."
   source ~/.laptop.local
 fi
 
