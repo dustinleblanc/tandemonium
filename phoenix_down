@@ -36,8 +36,12 @@ if [ ! -f "$HOME/.zshrc" ]; then
   touch "$HOME/.zshrc"
 fi
 
-fancy_echo "What is your Github Username?"
-read github_name
+if [ -z "$PS1" ]; then
+  fancy_echo "What is your Github Username?"
+  read github_name
+else
+  github_name=dustinleblanc
+fi
 
 fancy_echo "Updating system packages ..."
 if command -v aptitude >/dev/null; then
@@ -87,6 +91,10 @@ sudo aptitude install -y exuberant-ctags
 fancy_echo "Installing neovim ..."
 sudo aptitude install -y neovim
 
+fancy_echo "Setting Up Neovim for sweet autocomplete ..."
+sudo aptitude install -y python3-pip
+pip3 install --user neovim
+
 fancy_echo "Installing curl ..."
 sudo aptitude install -y curl
 
@@ -119,7 +127,13 @@ fancy_echo "Setting $LANDO_NODE as the global default Node ..."
 nodenv install -s $LANDO_NODE
 nodenv rehash
 
-
+if ! command -v yarn >/dev/null; then
+  curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+  echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+  sudo aptitude remove cmdtest
+  sudo aptitude update
+  sudo aptitude install --without-recommends yarn
+fi
 if [ ! -f ~/.ssh/id_rsa.pub ]; then
   fancy_echo "Making sure you're setup for ssh ..."
   fancy_echo "Enter your email and then press [ENTER]:"
@@ -190,11 +204,9 @@ if [ ! -f ~/antigen.zsh ]; then
   fancy_echo "Setting up Antigen for fancy ZSH things..."
   curl -L git.io/antigen > ~/antigen.zsh
   append_to_zshrc "source ~/antigen.zsh"
-  append_to_zshrc "antigen use oh-my-zsh"
   append_to_zshrc "antigen bundle git"
   append_to_zshrc "antigen bundle zsh-users/zsh-syntax-highlighting"
   append_to_zshrc "antigen bundle zsh-users/zsh-autosuggestions"
-  append_to_zshrc "antigen theme cloud"
   append_to_zshrc "antigen apply"
 fi
 
